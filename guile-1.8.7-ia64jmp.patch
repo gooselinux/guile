@@ -1,0 +1,206 @@
+commit e4d87bf9fd36fdf572bde0604168bcf7d2e9838d
+Author: Neil Jerram <neil@ossau.uklinux.net>
+Date:   Wed Aug 5 16:13:28 2009 +0100
+
+    Avoid clash with system setjmp/longjmp on IA64
+    
+    Problem was that if an application includes both libguile.h and the
+    system's setjmp.h, and is compiled on IA64, it gets compile errors
+    because of jmp_buf, setjmp and longjmp being multiply defined.
+    
+    * libguile/__scm.h (__ia64__): Define scm_i_jmp_buf, SCM_I_SETJMP and
+      SCM_I_LONGJMP instead of jmp_buf, setjmp and longjmp.
+    
+      (all other platforms): Map scm_i_jmp_buf, SCM_I_SETJMP and
+      SCM_I_LONGJMP to jmp_buf, setjmp and longjmp.
+    
+    * libguile/continuations.c (scm_make_continuation): Use `SCM_I_SETJMP'
+      instead of `setjmp'.
+      (copy_stack_and_call): Use `SCM_I_LONJMP' instead of `longjmp'.
+      (scm_ia64_longjmp): Use type `scm_i_jmp_buf' instead of `jmp_buf'.
+    
+    * libguile/continuations.h (scm_t_contregs): Use type `scm_i_jmp_buf'
+      instead of `jmp_buf'.
+    
+    * libguile/threads.c (suspend): Use `SCM_I_SETJMP' instead of
+      `setjmp'.
+    
+    * libguile/threads.h (scm_i_thread): Use type `scm_i_jmp_buf' instead
+      of `jmp_buf'.
+    
+    * libguile/throw.c (JBJMPBUF, make_jmpbuf, jmp_buf_and_retval): Use
+      type `scm_i_jmp_buf' instead of `jmp_buf'.
+      (scm_c_catch): Use `SCM_I_SETJMP' instead of `setjmp'.
+      (scm_ithrow): Use `SCM_I_LONGJMP' instead of `longjmp'.
+
+diff --git a/libguile/__scm.h b/libguile/__scm.h
+index b198f9d..a18ab9f 100644
+--- a/libguile/__scm.h
++++ b/libguile/__scm.h
+@@ -409,19 +409,28 @@
+     typedef struct {
+       ucontext_t ctx;
+       int fresh;
+-    } jmp_buf;
+-#   define setjmp(JB)				        \
++    } scm_i_jmp_buf;
++#   define SCM_I_SETJMP(JB)			        \
+       ( (JB).fresh = 1,				        \
+         getcontext (&((JB).ctx)),			\
+         ((JB).fresh ? ((JB).fresh = 0, 0) : 1) )
+-#   define longjmp(JB,VAL) scm_ia64_longjmp (&(JB), VAL)
+-    void scm_ia64_longjmp (jmp_buf *, int);
++#   define SCM_I_LONGJMP(JB,VAL) scm_ia64_longjmp (&(JB), VAL)
++    void scm_ia64_longjmp (scm_i_jmp_buf *, int);
+ #  else                 	/* ndef __ia64__ */
+ #   include <setjmp.h>
+ #  endif			/* ndef __ia64__ */
+ # endif				/* ndef _CRAY1 */
+ #endif				/* ndef vms */
+ 
++/* For any platform where SCM_I_SETJMP hasn't been defined in some
++   special way above, map SCM_I_SETJMP, SCM_I_LONGJMP and
++   scm_i_jmp_buf to setjmp, longjmp and jmp_buf. */
++#ifndef SCM_I_SETJMP
++#define scm_i_jmp_buf jmp_buf
++#define SCM_I_SETJMP setjmp
++#define SCM_I_LONGJMP longjmp
++#endif
++
+ /* James Clark came up with this neat one instruction fix for
+  * continuations on the SPARC.  It flushes the register windows so
+  * that all the state of the process is contained in the stack.
+diff --git a/libguile/continuations.c b/libguile/continuations.c
+index 69d2569..84a7fed 100644
+--- a/libguile/continuations.c
++++ b/libguile/continuations.c
+@@ -127,7 +127,7 @@ scm_make_continuation (int *first)
+   continuation->offset = continuation->stack - src;
+   memcpy (continuation->stack, src, sizeof (SCM_STACKITEM) * stack_size);
+ 
+-  *first = !setjmp (continuation->jmpbuf);
++  *first = !SCM_I_SETJMP (continuation->jmpbuf);
+   if (*first)
+     {
+ #ifdef __ia64__
+@@ -224,12 +224,12 @@ copy_stack_and_call (scm_t_contregs *continuation, SCM val,
+   scm_i_set_last_debug_frame (continuation->dframe);
+ 
+   continuation->throw_value = val;
+-  longjmp (continuation->jmpbuf, 1);
++  SCM_I_LONGJMP (continuation->jmpbuf, 1);
+ }
+ 
+ #ifdef __ia64__
+ void
+-scm_ia64_longjmp (jmp_buf *JB, int VAL)
++scm_ia64_longjmp (scm_i_jmp_buf *JB, int VAL)
+ {
+   scm_i_thread *t = SCM_I_CURRENT_THREAD;
+ 
+diff --git a/libguile/continuations.h b/libguile/continuations.h
+index f6fb96a..c61ab2d 100644
+--- a/libguile/continuations.h
++++ b/libguile/continuations.h
+@@ -43,7 +43,7 @@ SCM_API scm_t_bits scm_tc16_continuation;
+ typedef struct 
+ {
+   SCM throw_value;
+-  jmp_buf jmpbuf;
++  scm_i_jmp_buf jmpbuf;
+   SCM dynenv;
+ #ifdef __ia64__
+   void *backing_store;
+diff --git a/libguile/threads.c b/libguile/threads.c
+index 95a905c..f2bb556 100644
+--- a/libguile/threads.c
++++ b/libguile/threads.c
+@@ -276,7 +276,7 @@ unblock_from_queue (SCM queue)
+       var 't'
+       // save registers.
+       SCM_FLUSH_REGISTER_WINDOWS;      // sparc only
+-      setjmp (t->regs);                // here's most of the magic
++      SCM_I_SETJMP (t->regs);          // here's most of the magic
+ 
+    ... and returns.
+ 
+@@ -330,7 +330,7 @@ unblock_from_queue (SCM queue)
+       t->top = SCM_STACK_PTR (&t);
+       // save registers.
+       SCM_FLUSH_REGISTER_WINDOWS;
+-      setjmp (t->regs);
++      SCM_I_SETJMP (t->regs);
+       res = func(data);
+       scm_enter_guile (t);
+ 
+@@ -388,7 +388,7 @@ suspend (void)
+   t->top = SCM_STACK_PTR (&t);
+   /* save registers. */
+   SCM_FLUSH_REGISTER_WINDOWS;
+-  setjmp (t->regs);
++  SCM_I_SETJMP (t->regs);
+   return t;
+ }
+ 
+diff --git a/libguile/threads.h b/libguile/threads.h
+index 2b0e067..e22d9bd 100644
+--- a/libguile/threads.h
++++ b/libguile/threads.h
+@@ -107,7 +107,7 @@ typedef struct scm_i_thread {
+   /* For keeping track of the stack and registers. */
+   SCM_STACKITEM *base;
+   SCM_STACKITEM *top;
+-  jmp_buf regs;
++  scm_i_jmp_buf regs;
+ #ifdef __ia64__
+   void *register_backing_store_base;
+   scm_t_contregs *pending_rbs_continuation;
+diff --git a/libguile/throw.c b/libguile/throw.c
+index 92c5a1a..fcfde47 100644
+--- a/libguile/throw.c
++++ b/libguile/throw.c
+@@ -53,7 +53,7 @@ static scm_t_bits tc16_jmpbuffer;
+ #define DEACTIVATEJB(x) \
+   (SCM_SET_CELL_WORD_0 ((x), (SCM_CELL_WORD_0 (x) & ~(1L << 16L))))
+ 
+-#define JBJMPBUF(OBJ)           ((jmp_buf *) SCM_CELL_WORD_1 (OBJ))
++#define JBJMPBUF(OBJ)           ((scm_i_jmp_buf *) SCM_CELL_WORD_1 (OBJ))
+ #define SETJBJMPBUF(x, v)        (SCM_SET_CELL_WORD_1 ((x), (scm_t_bits) (v)))
+ #define SCM_JBDFRAME(x)         ((scm_t_debug_frame *) SCM_CELL_WORD_2 (x))
+ #define SCM_SETJBDFRAME(x, v)    (SCM_SET_CELL_WORD_2 ((x), (scm_t_bits) (v)))
+@@ -75,7 +75,7 @@ make_jmpbuf (void)
+ {
+   SCM answer;
+   SCM_NEWSMOB2 (answer, tc16_jmpbuffer, 0, 0);
+-  SETJBJMPBUF(answer, (jmp_buf *)0);
++  SETJBJMPBUF(answer, (scm_i_jmp_buf *)0);
+   DEACTIVATEJB(answer);
+   return answer;
+ }
+@@ -85,7 +85,7 @@ make_jmpbuf (void)
+ 
+ struct jmp_buf_and_retval	/* use only on the stack, in scm_catch */
+ {
+-  jmp_buf buf;			/* must be first */
++  scm_i_jmp_buf buf;		/* must be first */
+   SCM throw_tag;
+   SCM retval;
+ };
+@@ -179,7 +179,7 @@ scm_c_catch (SCM tag,
+   pre_unwind.lazy_catch_p = 0;
+   SCM_SETJBPREUNWIND(jmpbuf, &pre_unwind);
+ 
+-  if (setjmp (jbr.buf))
++  if (SCM_I_SETJMP (jbr.buf))
+     {
+       SCM throw_tag;
+       SCM throw_args;
+@@ -821,7 +821,7 @@ scm_ithrow (SCM key, SCM args, int noreturn SCM_UNUSED)
+       jbr->throw_tag = key;
+       jbr->retval = args;
+       scm_i_set_last_debug_frame (SCM_JBDFRAME (jmpbuf));
+-      longjmp (*JBJMPBUF (jmpbuf), 1);
++      SCM_I_LONGJMP (*JBJMPBUF (jmpbuf), 1);
+     }
+ 
+   /* Otherwise, it's some random piece of junk.  */

@@ -1,0 +1,48 @@
+diff -up guile-1.8.6/guile-config/guile-config.in.deplibs guile-1.8.6/guile-config/guile-config.in
+--- guile-1.8.6/guile-config/guile-config.in.deplibs	2008-12-04 19:30:41.000000000 +0100
++++ guile-1.8.6/guile-config/guile-config.in	2008-12-09 12:17:48.000000000 +0100
+@@ -152,10 +152,10 @@
+ 	      (list
+ 	       (get-build-info 'CFLAGS)
+                (if (or (string=? libdir "/usr/lib")
+-                       (string=? libdir "/usr/lib/"))
++                       (string=? libdir "/usr/lib64"))
+ 		   ""
+ 		   (string-append "-L" (get-build-info 'libdir)))
+-               "-lguile -lltdl"
++               "-lguile"
+ 	       (string-join other-flags)
+ 
+ 	       )))
+diff -up guile-1.8.6/libguile/Makefile.in.deplibs guile-1.8.6/libguile/Makefile.in
+--- guile-1.8.6/libguile/Makefile.in.deplibs	2008-12-09 12:15:36.000000000 +0100
++++ guile-1.8.6/libguile/Makefile.in	2008-12-09 12:15:36.000000000 +0100
+@@ -456,7 +456,7 @@ noinst_HEADERS = convert.i.c					\
+ 
+ libguile_la_DEPENDENCIES = @LIBLOBJS@
+ libguile_la_LIBADD = @LIBLOBJS@
+-libguile_la_LDFLAGS = @LTLIBINTL@ -version-info @LIBGUILE_INTERFACE_CURRENT@:@LIBGUILE_INTERFACE_REVISION@:@LIBGUILE_INTERFACE_AGE@ -export-dynamic -no-undefined
++libguile_la_LDFLAGS = @LTLIBINTL@ -version-info @LIBGUILE_INTERFACE_CURRENT@:@LIBGUILE_INTERFACE_REVISION@:@LIBGUILE_INTERFACE_AGE@ -export-dynamic -no-undefined -pthread
+ 
+ # These are headers visible as <guile/mumble.h>
+ pkginclude_HEADERS = gh.h
+@@ -2026,8 +2026,8 @@ libpath.h: $(srcdir)/Makefile.in  $(top_
+ 	@echo '#define SCM_LIBRARY_DIR "$(pkgdatadir)/$(GUILE_EFFECTIVE_VERSION)"'>>libpath.tmp
+ 	@echo '#define SCM_SITE_DIR "$(pkgdatadir)/site"' >> libpath.tmp
+ 	@echo '#define SCM_BUILD_INFO { \' >> libpath.tmp
+-	@echo '	{ "srcdir", "'"`cd @srcdir@; pwd`"'" }, \' >> libpath.tmp
+-	@echo ' { "top_srcdir",    "@top_srcdir_absolute@" }, \' >> libpath.tmp
++	@echo '	{ "srcdir", "" }, \' >> libpath.tmp
++	@echo ' { "top_srcdir",    "" }, \' >> libpath.tmp
+ 	@echo '	{ "prefix",	   "@prefix@" }, \' >> libpath.tmp
+ 	@echo '	{ "exec_prefix",   "@exec_prefix@" }, \' >> libpath.tmp
+ 	@echo '	{ "bindir",	   "@bindir@" }, \' >> libpath.tmp
+@@ -2048,7 +2048,7 @@ libpath.h: $(srcdir)/Makefile.in  $(top_
+ 	@echo '	{ "guileversion", "@GUILE_VERSION@" }, \' >> libpath.tmp
+ 	@echo '	{ "libguileinterface", "@LIBGUILE_INTERFACE@" }, \' \
+ 		>> libpath.tmp
+-	@echo '	{ "LIBS",	   "@GUILE_LIBS@" }, \' >> libpath.tmp
++	@echo '	{ "LIBS",	   "" }, \' >> libpath.tmp
+ 	@echo '	{ "CFLAGS",	   "@GUILE_CFLAGS@" }, \' >> libpath.tmp
+ 	@echo '	{ "buildstamp",    "'"`date`"'" }, \' >> libpath.tmp
+ 	@echo '}' >> libpath.tmp
