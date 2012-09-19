@@ -4,7 +4,7 @@ Summary: A GNU implementation of Scheme for application extensibility
 Name: guile
 %define mver 1.8
 Version: 1.8.7
-Release: 5%{?dist}
+Release: 4%{?dist}.goose.1
 Source: ftp://ftp.gnu.org/pub/gnu/guile/guile-%{version}.tar.gz
 URL: http://www.gnu.org/software/guile/
 Patch1: guile-1.8.7-multilib.patch
@@ -190,8 +190,9 @@ fi
 %{_includedir}/libguile.h
 
 %changelog
-* Mon May 23 2011 Miroslav Lichvar <mlichvar@redhat.com> - 5:1.8.7-5
+* Mon May 23 2011 Miroslav Lichvar <mlichvar@redhat.com> - 5:1.8.7-4.goose.1
 - fix test suite to work with new libtool (#659674)
+- GoOSe fix matches 5:1.8.7-5 from upstream
 
 * Thu Nov 19 2009 Miroslav Lichvar <mlichvar@redhat.com> - 5:1.8.7-4
 - fix building with new cpp (#538707)
